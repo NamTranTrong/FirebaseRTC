@@ -22,14 +22,14 @@ let roomId = null;
 function init() {
   document.querySelector('#cameraBtn').addEventListener('click', openUserMedia);
   document.querySelector('#hangupBtn').addEventListener('click', hangUp);
-  document.querySelector('#createBtn').addEventListener('click', createRoom);
-  document.querySelector('#joinBtn').addEventListener('click', joinRoom);
+  // document.querySelector('#createBtn').addEventListener('click', createRoom);
+  // document.querySelector('#joinBtn').addEventListener('click', joinRoom);
   roomDialog = new mdc.dialog.MDCDialog(document.querySelector('#room-dialog'));
 }
 
 async function createRoom() {
-  document.querySelector('#createBtn').disabled = true;
-  document.querySelector('#joinBtn').disabled = true;
+  // document.querySelector('#createBtn').disabled = true;
+  // document.querySelector('#joinBtn').disabled = true;
   const db = firebase.firestore();
 
   console.log('Create PeerConnection with configuration: ', configuration);
@@ -38,9 +38,20 @@ async function createRoom() {
   registerPeerConnectionListeners();
 
   // Add code for creating a room here
-  
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+
+  const roomWithOffer = {
+    offer: {
+      type: offer.type,
+      sdp: offer.sdp
+    }
+  };
+
+  const roomRef = await db.collection('rooms').add(roomWithOffer);
+  roomId = roomRef.id;
+  document.querySelector('#currentRoom').innerText = `Current room is ${roomId} - You are the caller!`;
   // Code for creating room above
-  
   localStream.getTracks().forEach(track => {
     peerConnection.addTrack(track, localStream);
   });
@@ -50,6 +61,7 @@ async function createRoom() {
   // Code for creating a room above
 
   // Code for collecting ICE candidates below
+  
 
   // Code for collecting ICE candidates above
 
@@ -62,10 +74,46 @@ async function createRoom() {
   });
 
   // Listening for remote session description below
-
+  roomRef.onSnapshot(async snapshot => {
+    console.log('Got updated room:', snapshot.data());
+    const data = snapshot.data();
+    if (!peerConnection.currentRemoteDescription && data.answer) {
+      console.log('Set remote description: ', data.answer);
+      const answer = new RTCSessionDescription(data.answer);
+      await peerConnection.setRemoteDescription(answer);
+    }
+  }); 
   // Listening for remote session description above
-
+  const answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+  
+  const roomWithAnswer = {
+      answer: {
+          type: answer.type,
+          sdp: answer.sdp
+      }
+  }
+  await roomRef.update(roomWithAnswer);
   // Listen for remote ICE candidates below
+  async function collectIceCandidates(roomRef, peerConnection, localName, remoteName) {
+    const candidatesCollection = roomRef.collection(localName);
+    
+    peerConnection.on("icecandidate", async event => {
+    if (event.candidate) {
+    const json = event.candidate.toJSON();
+    await candidatesCollection.add(json);
+    }
+    });
+    
+    roomRef.collection(remoteName).on("snapshot", snapshot => {
+    snapshot.docChanges().forEach(change => {
+    if (change.type === "added") {
+    const candidate = new RTCIceCandidate(change.doc.data());
+    peerConnection.addIceCandidate(candidate);
+    }
+    });
+    });
+    }
 
   // Listen for remote ICE candidates above
 }
@@ -195,5 +243,6 @@ function registerPeerConnectionListeners() {
         `ICE connection state change: ${peerConnection.iceConnectionState}`);
   });
 }
+
 
 init();
