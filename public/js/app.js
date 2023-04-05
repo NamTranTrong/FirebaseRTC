@@ -28,8 +28,8 @@ function init() {
 }
 
 async function createRoom() {
-  // document.querySelector('#createBtn').disabled = true;
-  // document.querySelector('#joinBtn').disabled = true;
+  document.querySelector('#createBtn').disabled = true;
+  document.querySelector('#joinBtn').disabled = true;
   const db = firebase.firestore();
 
   console.log('Create PeerConnection with configuration: ', configuration);
@@ -179,13 +179,14 @@ async function openUserMedia(e) {
 
   console.log('Stream:', document.querySelector('#localVideo').srcObject);
   document.querySelector('#cameraBtn').disabled = true;
-  document.querySelector('#joinBtn').disabled = false;
-  document.querySelector('#createBtn').disabled = false;
+  // document.querySelector('#joinBtn').disabled = false;
+  // document.querySelector('#createBtn').disabled = false;
   document.querySelector('#hangupBtn').disabled = false;
 }
 
 async function hangUp(e) {
   const tracks = document.querySelector('#localVideo').srcObject.getTracks();
+  document.querySelector('#hangupBtn').disabled = true;
   tracks.forEach(track => {
     track.stop();
   });
